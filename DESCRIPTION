@@ -1,0 +1,12 @@
+Package: sdpMig
+Type: Package
+Title: Modeling Optimal Migration
+Version: 1.0
+Date: 2018-06-15
+Author: Simeon Lisovski & Silke Bauer
+Maintainer: Simeon Lisovski <Simeon.Lisovski@vogelwarte.ch>
+Description: tba
+License: GPL (>= 2)
+Depends: RcppArmadillo
+Imports: Rcpp (>= 0.12.13), geosphere
+LinkingTo: Rcpp, RcppArmadillo, RcppProgress
