@@ -498,7 +498,7 @@ Rcpp::List BackwardIteration(bool pbar) {
   Rcpp::List out(6);
 
   // Progress bar
-  Progress p(((sdp::MaxT-sdp::MinT)-1)*(sdp::NSites), pbar);
+  Progress p(sdp::MaxT*(sdp::NSites), pbar);
 
   for (int time = (sdp::MaxT-1); time >= 0; --time)
   {

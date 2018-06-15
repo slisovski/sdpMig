@@ -5,8 +5,8 @@ Init <- function(MaxT, NSites, MaxX, w, xc, B0, b0, b1, b2, pred_a1, pred_a2, c,
     invisible(.Call(`_sdpMig_Init`, MaxT, NSites, MaxX, w, xc, B0, b0, b1, b2, pred_a1, pred_a2, c, speed, WindAssist, WindProb, ZStdNorm, PStdNorm, nTR_x, nTR_y, decError, dist, x_gain, y_gain, p_gain, expend))
 }
 
-BackwardIteration <- function() {
-    .Call(`_sdpMig_BackwardIteration`)
+BackwardIteration <- function(pbar) {
+    .Call(`_sdpMig_BackwardIteration`, pbar)
 }
 
 InitSim <- function(MaxT, NSites, MaxX, w, xc, B0, b0, b1, b2, pred_a1, pred_a2, c, speed, WindAssist, WindProb, ZStdNorm, PStdNorm, nTR_x, nTR_y, decError, dist, x_gain, y_gain, p_gain, expend, FMatrix, DMatrix1, DMatrix2, PMatrix1, PMatrix2) {

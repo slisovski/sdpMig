@@ -41,12 +41,13 @@ BEGIN_RCPP
 END_RCPP
 }
 // BackwardIteration
-Rcpp::List BackwardIteration();
-RcppExport SEXP _sdpMig_BackwardIteration() {
+Rcpp::List BackwardIteration(bool pbar);
+RcppExport SEXP _sdpMig_BackwardIteration(SEXP pbarSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    rcpp_result_gen = Rcpp::wrap(BackwardIteration());
+    Rcpp::traits::input_parameter< bool >::type pbar(pbarSEXP);
+    rcpp_result_gen = Rcpp::wrap(BackwardIteration(pbar));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -134,7 +135,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_sdpMig_Init", (DL_FUNC) &_sdpMig_Init, 25},
-    {"_sdpMig_BackwardIteration", (DL_FUNC) &_sdpMig_BackwardIteration, 0},
+    {"_sdpMig_BackwardIteration", (DL_FUNC) &_sdpMig_BackwardIteration, 1},
     {"_sdpMig_InitSim", (DL_FUNC) &_sdpMig_InitSim, 30},
     {"_sdpMig_simForaging", (DL_FUNC) &_sdpMig_simForaging, 4},
     {"_sdpMig_simFlying", (DL_FUNC) &_sdpMig_simFlying, 4},
