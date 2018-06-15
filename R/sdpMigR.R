@@ -73,7 +73,7 @@ makeSDPmig <- function(parms, project = "") {
 
 ### Backward iteration
 
-bwdIteration <- function(obj, pbar = FALSE) {
+bwdIteration <- function(obj, pbar = TRUE) {
   
   Init(obj@Init$MaxT, obj@Init$NSites, obj@Init$MaxX,
        obj@Species$w,obj@Species$xc,obj@Species$B0,obj@Sites$b0,obj@Sites$b1,obj@Sites$b2,obj@Sites$pred_a1,obj@Sites$pred_a2,
