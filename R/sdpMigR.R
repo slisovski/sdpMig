@@ -73,7 +73,7 @@ makeSDPmig <- function(parms, project = "") {
 
 ### Backward iteration
 
-bwdIteration <- function(obj) {
+bwdIteration <- function(obj, pbar = FALSE) {
   
   Init(obj@Init$MaxT, obj@Init$NSites, obj@Init$MaxX,
        obj@Species$w,obj@Species$xc,obj@Species$B0,obj@Sites$b0,obj@Sites$b1,obj@Sites$b2,obj@Sites$pred_a1,obj@Sites$pred_a2,
@@ -84,7 +84,7 @@ bwdIteration <- function(obj) {
        obj@Sites$dist,
        obj@Sites$gain[[1]],obj@Sites$gain[[2]],obj@Sites$gain[[3]],obj@Sites$expend)
   
-  out <- BackwardIteration()
+  out <- BackwardIteration(pbar)
   
   obj@Results$FitnessMatrix <- out[[1]]
   DM <- array(dim = c(dim(out[[2]]),2))

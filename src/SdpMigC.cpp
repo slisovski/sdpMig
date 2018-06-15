@@ -1,6 +1,8 @@
-#include "RcppArmadillo.h"
 // [[Rcpp::depends(RcppArmadillo)]]
- 
+// [[Rcpp::depends(RcppProgress)]]
+#include "RcppArmadillo.h"
+#include <progress.hpp>
+#include <progress_bar.hpp>
 // Namespace for Parameters
 namespace sdp {
 
@@ -463,7 +465,7 @@ void Init( int MaxT,
 
 
 // [[Rcpp::export]]
-Rcpp::List BackwardIteration() {
+Rcpp::List BackwardIteration(bool pbar) {
   
   /// Terminal Reward
   arma::cube FM_TR = arma::zeros<arma::cube>(sdp::MaxT+1, sdp::NSites+1, sdp::MaxX+1);
@@ -496,14 +498,14 @@ Rcpp::List BackwardIteration() {
   Rcpp::List out(6);
 
   // Progress bar
-  // Progress p((sdp::MaxT-1)*(sdp::NSites), progressbar);
+  Progress p(((sdp::MaxT-sdp::MinT)-1)*(sdp::NSites), pbar);
 
   for (int time = (sdp::MaxT-1); time >= 0; --time)
   {
     for (int site = 0; site < (sdp::NSites); ++site)
     {
       sdp::FMatrix(time, site, 0) = 0.0;
-      // p.increment(); // update progress
+      p.increment(); // update progress
 
       for(int x = 1; x <= (sdp::MaxX); ++x) {
 
