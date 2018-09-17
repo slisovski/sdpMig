@@ -20,14 +20,28 @@ CalcTR <- function(x, t) {
 
 makeSDPmig <- function(parms, project = "") {
   
-  sparms <- read.csv(parms$path, skip = 2, sep = ";", dec = ".")
-  r_gain.x <- as.matrix(sparms[,which(substring(names(sparms), 1,1)=="x")])
-  r_gain.y <- as.matrix(sparms[,which(substring(names(sparms), 1,1)=="y")])
-  r_gain.p <- matrix(sparms$stoch, ncol = ncol(r_gain.x), nrow = nrow(r_gain.y))
+  sparms <- read.csv(parms$path, skip = 2, sep = ",", dec = ".")
+    
+  if(nrow(sparms) != parms$NSites+1) error("Nsites is not the same length as sites in spreadsheet.")
+  
+  r_gain.x <- matrix(1:(parms$MaxT+1), nrow = nrow(sparms)-1, ncol = parms$MaxT+1, byrow=T)
+      xInd <- which(substring(names(sparms), 1,1)=="x")
+      yInd <- which(substring(names(sparms), 1,1)=="y")
+  r_gain.y <- do.call("rbind", apply(sparms, 1, function(x) {
+    na.approx(merge(data.frame(x = 0:(parms$MaxT)), data.frame(x = as.numeric(x[xInd]), y = as.numeric(x[yInd])), all.x = T)$y, rule = 3)
+  }))  
+  r_gain.p <- matrix(sparms$stoch[-nrow(sparms)], ncol = ncol(r_gain.x), nrow = nrow(r_gain.y))
+  
+      xExp <- which(substring(names(sparms), 1,5)=="dee_t")
+      yExp <- which(substring(names(sparms), 1,5)=="dee_y")
+  r_exp.y <- do.call("rbind", apply(sparms, 1, function(x) {
+    na.approx(merge(data.frame(x = 0:(parms$MaxT)), data.frame(x = as.numeric(x[xExp]), y = as.numeric(x[yExp])), all.x = T)$y, rule = 3)
+  }))  
+  
   r_dist   <- geosphere::distm(cbind(sparms$Lon, sparms$Lat), cbind(sparms$Lon, sparms$Lat))/1000
   
   new(
-    "SDPMig",
+    "SDPMig", 
     Name = project,
     Init = list(
       MaxT   = parms$MaxT,
@@ -40,6 +54,8 @@ makeSDPmig <- function(parms, project = "") {
       xc    = parms$xc,
       c     = parms$c,
       speed = parms$speed,
+      max_u = parms$max_u,
+      f     = parms$f,
       WindAssist = parms$WindAssist,
       WindProb   = parms$WindProb,
       ZStdNorm   = parms$ZStdNorm,
@@ -54,12 +70,12 @@ makeSDPmig <- function(parms, project = "") {
       b0   = sparms$b0,
       b1   = sparms$b1,
       b2   = sparms$b2,
-      expend  =  sparms$expend,
+      expend  =  r_exp.y,
       pred_a1 =  parms$pred_a1,
       pred_a2 =  parms$pred_a2,
-      gain    = list(gain.x = r_gain.x, 
-                     gain.y = r_gain.y, 
-                     gain.p = r_gain.p)
+      gain    =  list(gain.x = r_gain.x, 
+                      gain.y = r_gain.y, 
+                      gain.p = r_gain.p)
     ),
     Results = list(
       FitnessMatrix     = NA,
@@ -77,7 +93,8 @@ bwdIteration <- function(obj, pbar = TRUE) {
   
   Init(obj@Init$MaxT, obj@Init$NSites, obj@Init$MaxX,
        obj@Species$w,obj@Species$xc,obj@Species$B0,obj@Sites$b0,obj@Sites$b1,obj@Sites$b2,obj@Sites$pred_a1,obj@Sites$pred_a2,
-       obj@Species$c,obj@Species$speed,obj@Species$WindAssist,obj@Species$WindProb,
+       obj@Species$c,obj@Species$speed,obj@Species$max_u,obj@Species$f,
+       obj@Species$WindAssist,obj@Species$WindProb,
        obj@Species$ZStdNorm,obj@Species$PStdNorm,
        obj@Species$xFTReward,obj@Species$yFTReward,
        obj@Species$decError,
@@ -119,8 +136,87 @@ MigSim <- function(obj, NrInd, start_t, start_site, start_x) {
           obj@Results$DecisionMatrix[,,,1], obj@Results$DecisionMatrix[,,,2],
           obj@Results$ProbMatrix[,,,1], obj@Results$ProbMatrix[,,,2])
   
-  forwardSim(NrInd, start_t-1, start_site-1, start_x)
-  
+
+    x          <- round(runif(NrInd, start_x[1], start_x[2]),0)
+    
+    if(length(start_site)>1 & length(start_site)<start_x[1]) {
+      stop("start_site must have same length as numbers of individuals or a single site.")
+    }
+    if(length(start_site)==1) start_site <- rep(start_site, NrInd)
+    
+    SimOut = array(dim = c(length(x), 6, dim(obj@Results$FitnessMatrix)[1]))
+    
+    ### First entry
+    for(i in 1:dim(SimOut)[1]) {
+      SimOut[i, ,start_t] <- c(start_t, start_site[i], x[i], 0, 0, 0)
+    }
+    
+    ## SimOut: 1 = time, 2 = site, 3 = x, 4 = decision, 5 = flying, 6 = dead 
+    
+    for(time in 1:(dim(SimOut)[3]-1)) {
+      
+      for(ind in 1:dim(SimOut)[1]) {
+        
+        ## Not dead, not arrived, not flying
+        if(!SimOut[ind, 6, time] & 
+           SimOut[ind, 2, time]<nrow(obj@Sites$crds) & !SimOut[ind, 5, time]) {
+          
+          ## Decision
+          if(runif(1) < obj@Results$ProbMatrix[SimOut[ind, 2, time], time, SimOut[ind, 3, time], 1]) {
+            decision  <- obj@Results$DecisionMatrix[SimOut[ind, 2, time], time, SimOut[ind, 3, time], 1]
+          } else {
+            decision  <- obj@Results$DecisionMatrix[SimOut[ind, 2, time], time, SimOut[ind, 3, time], 2]
+          }
+          
+          ## Action
+          if(decision>=0) { ## Flying
+            
+            fl_help = simFlying(decision, time-1, SimOut[ind, 2, time]-1, SimOut[ind, 3, time])
+            
+            nextt = fl_help[1] + 1
+            if(nextt<=time) nextt <- time+1
+            if(nextt>dim(SimOut)[3]) time <- dim(SimOut)[3]
+            
+            nextx = fl_help[2] + 1
+            if(nextx <  0) {
+              nextx = 0
+              dead  = 1 } else  dead = 0
+            if(nextx > obj@Init$MaxX) nextx = obj@Init$MaxX
+            
+            SimOut[ind,,nextt] = c(nextt, decision+1, nextx, NA, 0, dead)
+            if(nextt>(time+1)) SimOut[ind,5:6,(time+1):(nextt-1)] = cbind(1,0)
+            if(SimOut[ind, 6, nextt])  SimOut[ind, 6, nextt:dim(SimOut)[3]] = 1 ## if dead make dead till the end
+            
+            if(SimOut[ind, 2, nextt]==nrow(obj@Sites$crds)) {
+              SimOut[ind,2:6, nextt:dim(SimOut)[3]] <- SimOut[ind,2:6,nextt]
+              SimOut[ind,1,   nextt:dim(SimOut)[3]] <- seq(nextt, dim(SimOut)[3])
+            }
+            
+          } else { ## Feeding
+            
+            fo_help = simForaging(abs(decision+1.0), time-1, SimOut[ind, 2, time]-1, SimOut[ind, 3, time])
+            
+            newx = fo_help[1]+1
+            dead = fo_help[2]
+            if(newx<=0) dead = 1
+            
+            if(newx > obj@Init$MaxX) newx = obj@Init$MaxX
+            
+            SimOut[ind,,time+1] = c(time+1, SimOut[ind, 2, time], newx, abs(decision+1.0), 0, dead)
+            
+            if(SimOut[ind, 6, time+1])  SimOut[ind, 6, (time+1):dim(SimOut)[3]] = 1 ## if dead make dead till the end
+    
+          }
+          
+        }
+        
+      } ## Ind loop
+      
+    } ## time loop
+    SimOut <- SimOut[,-5,] 
+    SimOut[,2,] <- SimOut[,2,]-1
+
+  SimOut
 }
 
 
@@ -191,7 +287,7 @@ fitnessSitePlot <- function(x, mfrow = c(3,3)) {
 }
 
 
-decisionPlot <- function(x, time = c(5, 40, 80)) {
+decisionPlot <- function(x, time = c(5, trunc(sdpM@Init$MaxT/2), sdpM@Init$MaxT-5)) {
   
   opar <- par(mfrow = c(3, length(time)), mar = c(2,2,1,1), oma = c(4,4,4,0))
   
@@ -267,11 +363,11 @@ simuPlot <- function(simu, sdpM, fun = "median") {
     tmp <- simu[i,,]
     tmp <- tmp[,!is.na(tmp[2,]) & tmp[5,]!=1]
     if(!is.null(nrow(tmp))) points(tmp[1,], tmp[3,], col = c(rainbow(sdpM@Init$NSites+1, alpha = 0.6)[tmp[2,]+1]), pch = 16) else {
-      points(tmp[1], tmp[3], col = c(rainbow(sdpM@Init$NSites, alpha = 0.6)[tmp[2]]), pch = 16) 
+      points(tmp[1], tmp[3], col = c(rainbow(sdpM@Init$NSites+1, alpha = 0.6)[tmp[2]]), pch = 16) 
     }
   }
   
-  legend("topleft", paste("site", 1:sdpM@Init$NSites), pch = 16, col = rainbow(sdpM@Init$NSites), bty="n",ncol=2)
+  legend("topleft", paste("site", 1:(sdpM@Init$NSites+1)), pch = 16, col = rainbow(sdpM@Init$NSites+1), bty="n",ncol=2)
   
   res <- matrix(NA, ncol = sdpM@Init$NSites+1, nrow = dim(simu)[1])
   

@@ -22,6 +22,8 @@ double pred_a1;
 double pred_a2;
 double c;
 double speed;
+double max_u;
+double f;
 arma::vec WindAssist;
 arma::vec WindProb;
 arma::vec ZStdNorm;
@@ -35,7 +37,7 @@ arma::mat y_gain;
 arma::mat p_gain;
 arma::vec nTR_x;
 arma::vec nTR_y;
-Rcpp::NumericVector expend;
+arma::mat expend;
 
 // Output
 arma::cube FMatrix;
@@ -196,7 +198,7 @@ double Predation (
   
   cor_u = u;
   cor_x = (double)(x);
-  netgain = ((u * f) - sdp::expend(site));
+  netgain = ((u * f) - sdp::expend(site, time));
   if (netgain <= 0.0) netgain = rew_tol;
   if (cor_u   <= 0.0) cor_u   = rew_tol;
   if (cor_x   <= 0.0) cor_x   = rew_tol;
@@ -230,7 +232,7 @@ double FindF (
   double res1, res2, part1, part2, interpolReward;
   res1 = 0.0; res2 = 0.0; part1 = 0.0; part2 = 0.0;
   
-  double expenditure = sdp::expend(site);
+  double expenditure = sdp::expend(site, time);
   double nextx = (double)(x) + gain * u - expenditure;
   switch (Eval(nextx, 0.0, (double)(sdp::MaxX)))
   {
@@ -267,13 +269,13 @@ double Foraging(const int& time,
   c = 1.0 - r;
   u0 = 0.0;
   u1 = r;
-  u3 = 1.0;
+  u3 = sdp::max_u;
   u2 = u1 + c * (u3 - u1);
   
   f1 = 0.0; f2 = 0.0;
   
-  mean = Interpolate(time, site, -99999999.9, 99999999.9, false);
-  SD   = Interpolate(time, site, 0.0, 99999999.9, true);
+  mean = sdp::y_gain(site,time);
+  SD   = sdp::p_gain(site,time);
   
   for (int accuracy = 0; accuracy < NStdNorm; ++accuracy)
   {
@@ -339,6 +341,7 @@ double Foraging(const int& time,
 
 // Flying
 // Major Flying Function - find best locatioon for time, site and x 
+// [[Rcpp::export]]
 double Flying(
     const int& time, 
     const int& site, 
@@ -353,19 +356,19 @@ double Flying(
   totalD = 0.0;
   Whold = 0.0;
   
-  range = sdp::c * (1.0 - (1.0/ (sqrt(1.0 + (double)(x)/(double)(sdp::MaxX))))); //determine Range
+  range = sdp::c * (1.0 - (1.0/ (sqrt(1.0 + ( ((double)(x) - (1 - sdp::f) * x)/(double)(sdp::MaxX)) )))); //determine Range
   
   totalD = sdp::dist(site, dep_site);
   for (int h = 0; h < sdp::WindProb.size(); ++h)
   {
     distance = totalD * (1.0 + sdp::WindAssist(h));
-    
+
     Sqr_c = (sdp::c * sdp::c);
     Sqr_ca = (sdp::c - (range - distance))*(sdp::c - (range - distance));
     nextx = ((Sqr_c/Sqr_ca) - 1.0) * sdp::MaxX;
     t = (double)(time) + (distance / sdp::speed);
-    
-    
+
+
     if (t >= (sdp::MaxT)) interpolReward = 0.0;
     else  if (nextx <= 0.0) interpolReward = 0.0;
     else
@@ -374,7 +377,7 @@ double Flying(
       res2 = (int)(nextx) + 1.0 - nextx;
       tim1 = t - (int)(t);
       tim2 = (int)(t) + 1.0 - t;
-      
+
       if ((nextx+1.0) > (double)(sdp::MaxX))
       {
         part1 = tim1*res1*sdp::FMatrix((int)(t)+1, dep_site, sdp::MaxX);
@@ -390,7 +393,7 @@ double Flying(
       interpolReward = part1+part2+part3+part4;
     }
     double help_old = Whold;
-    Whold = help_old + sdp::WindProb(h) * interpolReward;
+    Whold = help_old + (sdp::WindProb(h) * interpolReward);
   } //End h
   return Whold;
 }  // end Flying
@@ -415,6 +418,8 @@ void Init( int MaxT,
            double pred_a2,
            double c,
            double speed,
+           double max_u,
+           double f,
            Rcpp::NumericVector WindAssist,
            Rcpp::NumericVector WindProb,
            Rcpp::NumericVector ZStdNorm,
@@ -426,7 +431,7 @@ void Init( int MaxT,
            arma::mat x_gain,
            arma::mat y_gain,
            arma::mat p_gain,
-           Rcpp::NumericVector expend
+           arma::mat expend
            )
 {
   // Basic Parms
@@ -445,6 +450,8 @@ void Init( int MaxT,
   sdp::pred_a2 = pred_a2;
   sdp::c = c;
   sdp::speed = speed;
+  sdp::max_u = max_u;
+  sdp::f = f;
   sdp::WindAssist = WindAssist;
   sdp::WindProb = WindProb;
   sdp::ZStdNorm = ZStdNorm;
@@ -546,9 +553,14 @@ Rcpp::List BackwardIteration(bool pbar) {
 
         double sum_action = sdp::PMatrix1(site, time, x) + sdp::PMatrix2(site, time, x);
 
+        if (sum_action > 0.0) {
         sdp::PMatrix1(site, time, x) /= sum_action;
         sdp::PMatrix2(site, time, x) /= sum_action;
-
+        }
+        else {
+          sdp::PMatrix1(site, time, x) = 0.0;
+          sdp::PMatrix2(site, time, x) = 0.0;
+        }
         sdp::FMatrix(time, site, x)   = max_Reward;
 
       } // end x
@@ -595,7 +607,7 @@ void InitSim (int MaxT,
               arma::mat x_gain,
               arma::mat y_gain,
               arma::mat p_gain,
-              Rcpp::NumericVector expend,
+              arma::mat expend,
               arma::cube FMatrix,
               arma::cube DMatrix1,
               arma::cube DMatrix2,
@@ -662,15 +674,15 @@ arma::vec simForaging(double f_intensity, int time, int site, int x)
       hit = h;
     LB += sdp::PStdNorm(h);
   }
-  mean = Interpolate(time, site, -99999999.9, 99999999.9, false);
-  SD =   Interpolate(time, site, 0.0, 99999999.9, true);
+  mean = sdp::y_gain(site, time);
+  SD =   sdp::p_gain(site, time);
   
   double temp_gain = mean + sdp::ZStdNorm(hit) * SD;
   gain = temp_gain;
   if (gain < 0.0) gain = 0.0;
   
   pre_x = double(x);
-  double expenditure = sdp::expend(site);
+  double expenditure = sdp::expend(site, time);
   
   new_x = pre_x + f_intensity * gain - expenditure;
   
@@ -727,11 +739,12 @@ arma::vec simFlying(int decision, int time, int site, int x)
   }
   distance = total_D * (1.0 + sdp::WindAssist(hit));
   
-  range = sdp::c * (1.0 - (1.0/ (sqrt(1.0 + (double)(x)/(double)(sdp::MaxX)))));
+  range = sdp::c * (1.0 - (1.0/ (sqrt(1.0 + (  ((double)(x) - (1 - sdp::f) * x) / (double)(sdp::MaxX)) ))));
   
   Sqr_c  = (sdp::c * sdp::c);
   Sqr_ca = (sdp::c - (range - distance))*(sdp::c - (range - distance));
   nextx  = (((Sqr_c/Sqr_ca) - 1.0) * (double)(sdp::MaxX));
+  
   
   t =  time + (distance/ sdp::speed);
   
@@ -740,75 +753,6 @@ arma::vec simFlying(int decision, int time, int site, int x)
   return out;
 }
 
-// [[Rcpp::export]]
-arma::cube forwardSim(int Ind, int start_time, int start_site, arma::vec start_x)
-{
-  
-  double decision = 0.0;
-  arma::vec fl_help = arma::zeros<arma::vec>(2);
-  arma::vec fo_help = arma::zeros<arma::vec>(2);
-  arma::cube SimOut = arma::zeros<arma::cube>(Ind, 5, (sdp::MaxT));
-    
-    for (int indiv = 0; indiv < Ind; ++indiv)
-     {
-       SimOut(indiv, 2, 0) = Round(start_x(0) + R::runif(-start_x(1), start_x(1)));
-       SimOut(indiv, 1, 0) = start_site;
-       SimOut(indiv, 0, 0) = start_time;
-     }  
-    
-    for (int time = 1; time < sdp::MaxX; ++time)
-    {
-      for (int indiv = 0; indiv < Ind; ++indiv)
-      {
-        if ((SimOut(indiv, 0, time-1) <= time) && (SimOut(indiv, 4, time-1) == 0) &&
-            (SimOut(indiv, 1, time-1) <  sdp::NSites))
-        {
-        
-        if (R::runif(0,1) < sdp::PMatrix1(SimOut(indiv, 1, time-1), time-1, SimOut(indiv, 2, time-1))) {
-                 decision = sdp::DMatrix1(SimOut(indiv, 1, time-1), time-1, SimOut(indiv, 2, time-1));
-        } else {
-                 decision = sdp::DMatrix2(SimOut(indiv, 1, time-1), time-1, SimOut(indiv, 2, time-1));
-        }
-        
-        if (decision >= 0.0)
-            {
-            fl_help = simFlying(decision, time-1, SimOut(indiv, 1, time-1), SimOut(indiv, 2, time-1));
-            int nextt = fl_help(0);
-            if (nextt<=SimOut(indiv, 0, time-1)) nextt = nextt+1;
-            int nextx = fl_help(0);
-            if (nextx < 0) nextx = 0;
-            SimOut(indiv, 0, time) = nextt;
-            SimOut(indiv, 1, time) = decision;
-            SimOut(indiv, 2, time) = nextx;
-            } 
-            else {
-              fo_help = simForaging(fabs(decision+1.0),time-1, SimOut(indiv, 1, time-1), SimOut(indiv, 2, time-1));
-              int newx = fo_help(0);
-              int dead = fo_help(1);
-              if( newx > sdp::MaxX) newx = sdp::MaxX;
-              SimOut(indiv, 0, time) = time;
-              SimOut(indiv, 1, time) = SimOut(indiv, 1, time-1);
-              SimOut(indiv, 2, time) = newx;
-              SimOut(indiv, 3, time) = fabs(decision+1.0);
-              SimOut(indiv, 4, time) = dead;
-            }
-        
-        } else {
-          SimOut(indiv,0,time) = SimOut(indiv,0,time-1)+1;
-          SimOut(indiv,1,time) = SimOut(indiv,1,time-1);
-          SimOut(indiv,2,time) = SimOut(indiv,2,time-1);
-          SimOut(indiv,4,time) = SimOut(indiv,4,time-1);
-        }
-        if (SimOut(indiv, 2, time) <= 0) {
-            SimOut(indiv, 4, time)  = true;
-            SimOut(indiv, 2, time)  = 0.0;
-        }
-      }
-    }
-
-  return SimOut;
-  
-}
 
 
 
