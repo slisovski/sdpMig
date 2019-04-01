@@ -9,4 +9,4 @@ Description: tba
 License: GPL (>= 2)
 Depends: RcppArmadillo
 Imports: Rcpp (>= 0.12.13), geosphere
-LinkingTo: Rcpp, RcppArmadillo, RcppProgress
+LinkingTo: RcppArmadillo, Rcpp, RcppArmadillo, RcppProgress
