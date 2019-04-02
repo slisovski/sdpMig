@@ -2,14 +2,17 @@
 # library(devtools)
 # install_github("slisovski/sdpMig", force = TRUE)
  
- 
-library(spdMig)
+library(sdpMig)
+library(zoo)
+library(maptools)
+data(wrld_simpl)
 
 ###############################################
 ### Parameters ################################
 ###############################################
 
 parms <- list(
+  
   MaxT   = 100,  ## Maximum time
   MaxX   = 100,  ## Maximum body condition
   NSites = 8,    ## Excl. Breeding site
@@ -40,7 +43,7 @@ parms <- list(
   
   
   ### Site specific Parameters ###
-  path = "g://Dropbox//Modelling_Migration_SDP//Packages//sdpMig//Parameters//WFGparameter_ex4.csv",
+  path = "Parameters/WFGParameter_ex4.csv",
 
   pred_a1  = 2,
   pred_a2  = 2,
@@ -52,36 +55,60 @@ parms <- list(
 ) ## End parameter ####
 
 
-#######################
-### Simulation ########
-#######################
+## Site specific paramters exploration
+siteTab <- read.csv(parms$path, skip = 2, sep = ",", dec = ".")
+head(siteTab)
 
 
-setwd("g:/Dropbox/Modelling_Migration_SDP/packages/sdpMig/Output/")
-write("Scenario,mort,stag1,stag2,stag3,stag4,stag5,stag6,stag7,stag8,stag9,meanX1,meanX2,meanX3,meanX4,meanX5,meanX6,meanX7,meanX8,meanX9,fuelrate1,fuelrate2,fuelrate3,fuelrate4,fuelrate5,fuelrate6,fuelrate7,fuelrate8,fuelrate9",
-      file="test_whitefronts.csv", sep=",", append=F)
+cls <-  topo.colors(nrow(siteTab))
 
-sims <- c("default","change_B0","change_max_u","change_f","change_flightspeed","change_expend","change_sitefuel")
+### Sites
+opar <- par(mar = c(6,6,1,1))
+plot(siteTab$Lon, siteTab$Lat, type = "n", las = 1, xlab = "Longitude", ylab = "Latitude", bty = "n", mgp = c(4,2.7,2))
+plot(wrld_simpl, col = "grey90", border = "grey50", add = T)
+points(siteTab$Lon, siteTab$Lat, type = "b", cex = 5, pch= 21, lwd = 2, bg = adjustcolor(cls, alpha.f = 0.7))
+text(siteTab$Lon, siteTab$Lat, 1:nrow(siteTab), cex = 1.1)
+par(opar)
 
-for (scenario in 1:length(sims)) {
+### Quality (energy intake)
+time <- siteTab[,substring(names(siteTab), 1,1)=="x"]
+dei  <- siteTab[,substring(names(siteTab), 1,1)=="y"]
 
-    sdp  <- makeSDPmig(parms, "Whitefronted Geese")
+plot(NA, xlim = c(range(time, na.rm = T)), ylim = range(dei, na.rm = T), xlab = "time", ylab = "DEI (x)")
+for(i in 1:nrow(siteTab)) lines(time[i,], dei[i,], type = "o", pch = 16, lwd = 2, col = cls[i])
+
+par(new = T)
+plot(parms$xFTReward, parms$yFTReward, xlim = c(range(time, na.rm = T)), ylim = range(parms$yFTReward, na.rm = T),
+     xaxt = "n", yaxt = "n", xlab = "", ylab = "", type = "l", lty = 2)
+
+
+
+#############################
+### Backward Simulation #####
+#############################
+
+
+sdp  <- makeSDPmig(parms, "Whitefronted Geese")
+sdpM <- bwdIteration(sdp, pbar = TRUE)
+
+
+#############################
+### Forward Simulation ######
+#############################
+
+simu <- MigSim(sdpM, 100, 1, 1, c(25, 35)) #MigSim(object, NrInd, starttime, startsite, start_x(min, max))
+
+smP  <- simuPlot(simu, sdpM, fun = "mean")
+decisionPlot(sdpM)
     
-    switch(sims[scenario],
-           "change_B0" =           {sdp@Species$B0           <- sdp@Species$B0 * 0.9 },   # 2
-           "change_max_u" =        {sdp@Species$max_u        <- sdp@Species$max_u * 0.9}, # 3
-           "change_f" =            {sdp@Species$f            <- sdp@Species$f * 0.9},     # 4
-           "change_flightspeed" =  {sdp@Species$speed        <- sdp@Species$speed * 0.9 },# 5
-           "change_expend" =       {sdp@Sites$expend         <- sdp@Sites$expend * 1.1 }, # 6
-           "change_sitefuel" =     {sdp@Sites$gain$gain.y    <- sdp@Sites$gain$gain.y * 0.9}  # 7
-           )
+    
 
-    sdpM <- bwdIteration(sdp, pbar = TRUE)
-    simu <- MigSim(sdpM, 100, 1, 1, c(25, 35)) #MigSim(object, NrInd, starttime, startsite, start_x(min, max))
-    smP  <- simuPlot(simu, sdpM, fun = "mean")
-    decisionPlot(sdpM)
-    
-    
+
+
+
+
+
+
     # Calculate three major output measures: mortality, staging times per site, body condition per site, fuelling rates per site 
     # Mortality
     mort <- sum(apply(smP, 1, function(x) any(is.na(x))))/nrow(smP); mort 
