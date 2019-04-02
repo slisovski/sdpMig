@@ -1,0 +1,193 @@
+---
+title: "Model description - White-fronted geese"
+author: "Simeon Lisovski & Silke Bauer"
+date: "2019 M04 2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Modelling approach 
+
+State-dependent optimality models calculate fitness-maximizing decisions depending on time, and a set of state-variables – in our case, location and body reserves. They use an optimization procedure (linear programming) that starts at the final time-point and calculates backwards the sequence of behavioural decision that would maximize fitness. 
+The fundamental behavioural decisions in each time-step in the model are basically to stay at its present location or to migrate to one of the following sites – each of which has consequences on the animal’s state (body reserves and location). Staying at the present location may allow foraging and accumulating fuel stores that are required for covering the next migratory step or for accumulating reserves required for breeding. However, staying and foraging also entails mortality risks – as carrying body reserves may be costly (Witter & Cuthill 1993) and  foraging may reduce vigilance (see below), and a time-cost when staying beyond the best time for arrival at the breeding grounds. Alternatively, flying to one of the following sites may bring a goose closer to its breeding grounds and thus, facilitate arrival at the breeding grounds within the short time-window that allows successful breeding. However, if this ‘target-site’ does not provide food yet, staying there might increase starvation risk.   
+Once the optimal decisions have been calculated for all possible combinations of time, body reserve levels and for all locations, forward simulations are run to generate predictions on individual birds during their journey from the wintering to breeding grounds. 
+
+
+## Model details and standard parameter values
+### State variables
+
+Birds were characterized by their body reserves, x, which may vary between 0, when the bird has reached a minimum body mass, has no reserves and is assumed to die of starvation, and xmax = 100 where the bird has reached its maximum fuel load. For White-fronted geese, minimum and maximum body mass are 1.5 and 2.5 kg, respectively, and given an energy content of fuel of 29,000 J/g (Madsen & Klaassen 2006), xmax corresponds to 29,000 kJ. Body reserves may increase with foraging and decrease during migratory flights (see below).
+We consider the following distinct locations, i: the wintering site in the Netherlands (NL), stop-over sites in Germany (D), Poland (PL), Lithuania/Ukraine (Lit/Ukr), Estonia/Tver (Est/Tver), Leningrad Oblast/Karelia/Kostroma (Kar/Kos), Arkhangelsk Oblast/Komi (Ark/Kom), Nenetskii Okrug (Nen) and the breeding grounds in Kolguev (Fig. 1, Table S1). The migration period was divided into whole days, t, and preparation for spring migration was assumed to start in NL from 1 March onwards (Table 2).  
+
+
+### Terminal Reward
+
+The terminal reward is a central part of the model as it determines the fitness-outcomes of arrival in the breeding grounds (and thus, the starting point of the backward calculations). In the case of Arctic-breeding geese, both arrival time in the breeding grounds and body condition at arrival determine this year’s expected reproductive success and there is also expected reproductive success from future breeding attempts.   
+Based on empirical studies (e.g. Klaassen et al. 2017), we know that geese follow a capital-breeding strategy and thus, higher body reserves allow higher reproductive investments (similar to Madsen & Klaassen 2006) and we use the following relation between state at arrival and number of young produced (Klaassen et al. 2017):
+
+
+
+
+$$R_{x} = \frac{1}{2} \times (\frac{exp(w(x-xc)) - exp(-w(x-xc))}{exp(w(x-xc)) + exp(-w(x-xc))} + 1)$$
+where w= 0.028 and xc = 55 (corresponding to 15,950 kJ).
+
+
+
+```{r TR, echo = FALSE, figure = TRUE, fig.cap= "Figure 1: Body condition at arrival in the breeding grounds influences reproductive investment, i.e. the number of young expected from this year’s breeding attempt increases with the level of body reserves (‘capital breeding’).   "}
+x = 1:100
+y = 0.5*(((exp(0.028*(x-55)) - exp(-0.028*(x-55)))/(exp(0.028*(x-55)) + exp(-0.028*(x-55)))) +1)
+
+plot(x, y, type = "l", ylab = "R(x)", xlab = "x", col = "orange", lwd = 2)
+```
+
+
+Body condition at arrival in the breeding grounds influences reproductive investment, i.e. the number of young expected from this year’s breeding attempt increases with the level of body reserves (‘capital breeding’).   
+
+
+$$K_{t} = \begin{cases} 0 \space if \space t < t_{min} \space or \space t > t_{max} \\ 1 \space if \space t_{min} \le t \le t_{max}\end{cases}$$
+
+We set tmin=26 May and tmax=8 June based on the arrival dates of 16 tracked white-fronted geese, for which breeding or non-breeding was inferred from their presence in the subsequent few weeks and little movement around a suitable nesting location (van Wijk et al. 2012). When arriving at the breeding grounds outside this period a fitness gain can thus only be achieved from future breeding attempts, B, which depends on survival and reproductive success in future breeding attempts. As detailed data are lacking on how current body reserves influence future reproduction or survival in this species, we tentatively set B = 3, reflecting a relatively long-lived species. Although it may seem that adding this constant future reproductive success is unnecessary, it can drive trade-offs between this year’s and future reproduction. Perhaps more important even, it separates fatal from unsuccessful strategies, i.e. strategies that would lead to, e.g., death by starvation, and strategies that only loose current reproductive outcome, e.g. by arriving too late or with insufficient body stores.    
+
+A bird’s overall fitness is thus determined by 
+
+$$F(x,t,N) = K(t) \times R(x) + B$$
+
+### Changes in body reserves and location  
+
+In each time-step, a bird may choose to remain on its present location or to migrate to another site. If remaining on the present site, a bird requires energy, e, for maintaining its metabolism, which is in White-fronted geese ca. 1160 kJ/d (Baveco, Kuipers & Nolet 2011). When staying, a bird may choose to forage with intensity u (see below). If gain from foraging exceeds expenditure, the bird increases, and otherwise depletes, its energy reserves. 
+Since there might be stochastic differences in individual foraging success, we modelled the gain rate as a discrete random variable with outcomes g1(i), …gj(i), …, gmax(i) and the probability of achieving a particular maximum gain is given by 
+
+$$P\left[G=g_j(i)\right] = p_j, where \sum_j p_j(i) = 1$$
+Stochastic differences in foraging success imply that there might be series of ‘bad luck’ in foraging, during which an animal could starve to death when reserves are insufficient. Accounting for this will often yield a foraging intensity that is different from a foraging intensity that results from deterministic foraging success. 
+The maximum gain can differ between sites (Table S1). The foraging intensity u (0 <= u <= 1) is the fraction of the maximum gain G that birds will deposit given the maximum body reserves level is not exceeded. Consequently, if a bird with body reserves x forages with intensity u at site i, its body reserves in the next time-step will be , with the energy expenditure e being 1160 kJ/d (Baveco, Kuipers & Nolet 2011).  
+
+Maintaining fuel stores and foraging incurs fitness costs in terms of increased risk of predation or injury (Witter & Cuthill 1993). We assume the daily ‘predation’ risk m(x,u,i) depends on foraging intensity (as this reduces vigilance) and carrying body stores (as this reduces manoeuvrability and/or escape behaviour) and define it as follows (Houston, McNamara & Hutchinson 1993): 
+
+$$m(x,u,j) = m_o(i) + b_1(i) \times) \frac{(x+ug_j(i))^{a_1+1} - x^{a_1+1}}{(a_1+1)ug_j(i)} \times b_2(i)u^{a_2}$$
+
+with background predation risk, m0 = 10-4, mass-dependent coefficient b1 = 10-3, foraging-intensity-dependent coefficient b2 = 10-4 and a1 and a2  the mass- and foraging-dependent exponents, which were set to 2 (Madsen, Frederiksen & Ganter 2002), foraging intensity, u, (0 <= u <=1) and stochastic gain gj(i) at site i (see eqn A4 above). Although the coefficients are chosen such that the predation risk m(x, u, i) is typically much smaller than one (Fig. A2), we constrain 0 <= m(x,u,i) <= 1 and for u=0.0, we set m(x,u,i)=m_0 (i).
+
+Please note that with this approach, predation risk is not fixed per se but, rather, is used to specify the costs of behaviours and the costs of being in a specific state (Fig. S2). Animals can respond to these costs by adjusting their behaviour such that they minimize mortality, or rather, maximize fitness and an optimization procedure evaluates these costs and benefits for the animal’s current state and identifies the trade-off (the best u) between avoiding starvation and predation, and gaining energy.
+
+
+```{r foraging, echo = FALSE, figure  = TRUE, fig.cap = "Figure 2: Daily predation risk across all possible levels of foraging intensity, u, and body condition, x, under the use oft he standard parameter values for m0, b1, and b2. The specific predation risk an animal experiences depends on the trade-off between gaining energy and avoiding predation and may vary over time, location and body reserve level.", fig.height=7, fig.width=7, warning=FALSE, message=FALSE}
+
+library(raster)
+
+u = seq(0,1, length = 100)
+x = seq(0,100, length = 100)
+
+out <- expand.grid(x, u)
+
+m0 = 10e-4
+b1 = 10e-3
+b2 = 10e-4
+a1 = 2
+a2 = 2
+g = 3
+
+m = apply(out, 1, function(x) m0 + b1*(((x[1]+x[2]*g)^(a1+1) - x[1]^(a1+1))/((a1+1)*x[2]*g)) * b2*x[2]^a2)
+
+r0 <- raster(xmn = 0, xmx = 1, ymn = 0, ymx = 100)
+  r <- rasterize(out[,c(2,1)], r0, field = m)
+  
+plot(r, xlab = "Foraging intensity, u", ylab = "Body reserves, x", legend = FALSE, col = viridis::plasma(100))
+
+```
+
+
+
+If the bird decides to forage, is should forage with an intensity u that yields the maximum expected fitness:
+
+$$H_f(x,t,i) = max\left[(1-m(x,u,i)) F(x+ug(i,t) - e,t + 1,i)\right]$$
+
+
+
+
+
+
+
+
+Alternatively, a bird may decide to migrate to a following or a preceding site given its body reserves permit to cover the distance D to the destination site. Consequently, its body reserves upon arrival, xa, at this destination are (Alerstam & Hedenström 1998):
+
+$$x_a = (\frac{c^2}{c-(c(1-(1+x/x_max)^-0.5)-D)^2})x_max$$
+where c is a flight range parameter which is calculated using 
+
+
+$$c = \frac{D_max}{1-(1+x_f/x_max)^-0.5}$$
+
+and Dmax is the maximum flight range when dedicating fraction xf of the maximum fuel load xmax to flight. For white-fronted geese in this study we used xf = xmax. Dmax was calculated by dividing the maximum fuel load by the flight costs in terms of energy over time:
+
+$$D_max = \frac{x_max}{f}$$
+
+A maximum fuel load, xmax, of 29,000 kJ yields thus the maximum flight range Dmax = 4328
+km and the flight range parameter, c = 14776.
+
+If an individual decides to depart, it should fly to the site j yielding the maximum expected fitness at the destination:
+
+$$H_d(x,t,i) = \sum_{j}^{j-1}F(x_a,t+(\sum_{z=1}^{j-1}D_z / v), j)$$
+
+where v is flight speed, which was estimated at 1440 km/d following an allometric equation provided by Clausen et al. (2002), assuming slight wind support (10%). 
+The optimal decision is the behavioural alternative, foraging or departing; yielding the highest future expected reproductive success:
+
+$$F(x,t,i) = max\left[H_f(x,t,i), H_d(x,t,i)\right]$$
+With the dynamic programming equations, a matrix can be compiled containing the optimal behavioural decisions for all combinations of fuel stores, times and sites. Furthermore, we used the errors in decision making approach, which allows deviations from perfectly optimal behaviour given such deviations have only little cost (McNamara et al. 1997). Consequently, for each action a probability is calculated, with which this action is performed and which depends on the fitness consequences of this action.
+These probabilities are then used in subsequent forward simulations to follow individual birds during their journey and to generate predictions of individual migratory behaviour, i.e. departure and staging times and, more importantly, to quantify the fitness consequences of given environmental circumstances. With this procedure, we assume that the birds “know” the conditions at sites ahead and respond optimally to these. Although this may seem a strong assumption, other goose species have been shown to respond to changes in site condition along the route with a migration behaviour near the predicted optimal (Bauer et al. 2008) .  
+
+
+### Parameters
+
+#### Site paramters
+
+Region | Acronym | Onset of spring (days after 1 March) | MEI (MJ/day)
+------------- | ------------- | --------------- | ---------------
+Netherlands | NL | 0 | 1.30 |
+Germany | D | 5 | 1.45 |
+Poland | PL | 10 | 1.59 |
+Lithuania/Ukraine | Lit/Ukr | 20 | 1.74 |
+Estonia/Tver | Est/Tver | 30 | 1.88 | 
+Karelia/Kostroma | Kar/Kost | 40 | 2.03 |
+Arkhangelsk/Komi | Ark/Kom | 50 | 2.17 |
+Nenteski | Nen | 70 | 2.32 |
+
+
+#### Species paramters
+
+Parameter | Value | Description
+------------- | ------------- | ---------------
+$R(x) - w$ and $x_x$ | 0.028 and 55 | Slope and inflection point for body-reserve dependent part of terminal reward, xc corresponds to 15,950 kJ |
+$K(t) - t_{min}$ and $t_{max}$ | 26 May - 8 June | Time-window during which successful breeding attempt can be started |
+B | 3 | Expected reproductive success from future breeding attempts |
+x | $0 \le x \le 100 $ | Level of body reserves, xmax corresponds to 29,000kJ |
+e | 1160 kJ/d | Daily energy expenditure |
+u | $ 0 \le u \le 1$| Foraging intensity |
+$D_{max}$ | 4328 km | Maximum fligth range |
+c | 14776 | Fligth range parameter |
+v | 1440 km/d | fligth speed |
+
+
+
+
+
+### Forward simulations
+
+Using the optimal decision matrix, we followed individual birds on their migration to the breeding grounds using a Monte-Carlo simulation method. To this end, we let a population of 100 individuals with normally distributed initial body reserves of x = 33 ± 10 start in the wintering site at t = 0. Thereafter, all individuals behave nearly optimally according to their present body reserves, site and time by performing an action, i.e. migrating to site j or staying and foraging with intensity u, with probabilities corresponding the their fitness reward. The fuel gain at a given site is determined by a random number and the probability distribution of  . 
+From these individual migrations, departure times from the Netherlands, staging times on any stop-over sites and arrival time in the breeding sites were recorded. Furthermore, we followed body reserve dynamics over time, determined mortality over the entire migration period and expected reproductive success on arrival in the breeding grounds.
+As the foraging of geese and the agricultural conflict this may raise was of particular interest in this study, we also determined the daily per-capita and cumulative energy consumption in the Netherlands. Although both measures can probably not be translated directly into absolute numbers of agricultural damage, they provide a relative measure to compare between scenarios and could be translated into damage to specific crops if it is known how much biomass of specific crops is required for one unit of the geese’ energy consumption. 
+
+
+
+## References
+* Alerstam, T. & Hedenström, A. (1998) The development of bird migration theory. Journal of Avian Biology, 29, 343–369.
+* Bauer, S., Van Dinther, M., Høgda, K.-A., Klaassen, M. & Madsen, J. (2008) The consequences of climate-driven stop-over sites changes on migration schedules and fitness of Arctic geese. Journal of Animal Ecology, 77, 654–660.
+* Baveco, J.M., Kuipers, H. & Nolet, B.A. (2011) A large-scale multi-species spatial depletion model for overwintering waterfowl. Ecological Modelling, 222, 3773–3784.
+* Houston, A.I., McNamara, J.M. & Hutchinson, J.M.C. (1993) General results concerning the trade-off between gaining energy and avoiding predation. Philosophical Transactions of the Royal Society B: Biological Sciences, 341, 375–397.
+* Klaassen, M., Hahn, S., Korthals, H. & Madsen, J. (2017) Eggs brought in from afar : Svalbard-breeding Pink-footed Geese can fly their eggs across the Barents Sea. , 1–16.
+* Madsen, J., Frederiksen, M. & Ganter, B. (2002) Trends in annual and seasonal survival of Pink-footed Geese Anser brachyrhynchus. Ibis, 144, 218–226.
+* Madsen, J. & Klaassen, M. (2006) Assessing body condition and energy budget components by scoring abdominal profiles in free-ranging pink-footed geese Anser brachyrhynchus. Journal of Avian Biology, 37, 283–287.
+* McNamara, J.M., Webb, J.N., Collins, E.J., Székely, T. & Houston, A.I. (1997) A General Technique for Computing Evolutionarily Stable Strategies Based on Errors in Decision-making. Journal of Theoretical Biology, 189, 211–225.
+* Witter, M.S. & Cuthill, I.C. (1993) The Ecological Costs of Avian Fat Storage. Philosophical Transactions of the Royal Society of London B: Biological Sciences, 340.
+

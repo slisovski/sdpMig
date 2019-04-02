@@ -3,9 +3,9 @@
 # install_github("slisovski/sdpMig", force = TRUE)
  
 library(sdpMig)
-library(zoo)
-library(maptools)
-data(wrld_simpl)
+  library(zoo)
+  library(maptools)
+  data(wrld_simpl)
 
 ###############################################
 ### Parameters ################################
@@ -74,7 +74,7 @@ par(opar)
 time <- siteTab[,substring(names(siteTab), 1,1)=="x"]
 dei  <- siteTab[,substring(names(siteTab), 1,1)=="y"]
 
-plot(NA, xlim = c(range(time, na.rm = T)), ylim = range(dei, na.rm = T), xlab = "time", ylab = "DEI (x)")
+plot(NA, xlim = c(range(time, na.rm = T)), ylim = range(dei, na.rm = T), xlab = "time", ylab = "MEI (x)")
 for(i in 1:nrow(siteTab)) lines(time[i,], dei[i,], type = "o", pch = 16, lwd = 2, col = cls[i])
 
 par(new = T)
@@ -96,16 +96,12 @@ sdpM <- bwdIteration(sdp, pbar = TRUE)
 ### Forward Simulation ######
 #############################
 
-simu <- MigSim(sdpM, 100, 1, 1, c(25, 35)) #MigSim(object, NrInd, starttime, startsite, start_x(min, max))
+simu <- MigSim(sdpM, 100, 1, 1, c(25, 35))
 
 smP  <- simuPlot(simu, sdpM, fun = "mean")
 decisionPlot(sdpM)
     
     
-
-
-
-
 
 
 
@@ -142,86 +138,26 @@ decisionPlot(sdpM)
       indRate[,sdp@Init$NSites+1] <-  apply(cond, 3, function(x) x[nrow(x),3])
     mean.fuelrates <- apply(indRate, 2, mean, na.rm=T); mean.fuelrates
     
-    #  plot(apply(indRate, 2, median, na.rm = T)[-9]); points(apply(indRate, 2, mean, na.rm = T)[-9], pch = 16)  
-      
-    write(cbind(sims[scenario], mort, t(mean.staging), t(mean.bodycond), t(mean.fuelrates) ), 
-          file="test_whitefronts.csv", sep=",", append=T, ncolumns = (sdp@Init$NSites+1) * 3 + 2)
-}
 
 
-
-
-
-
-
-
-
-
-
-
-matplot(t(simu[,3,]), type = "l", col = "grey90", lty = 1)
-matplot(t(meanX), type = "l", col = rainbow(9), lwd = 2, lty = 1, add = T)
-
-
-
-
-
-
-
-
-
-
-
-
-#apply(simu, 1, function(x) aggregate(x[2,], by = list(x[,3], FUN = apply(x[2:3,], 1, sum))
-#merge(data.frame(Var1 = 0:sdp@Init$NSites), as.data.frame(table(x[2])), all.x = T)[,2]}) 
-
-
-
-######### Calculate individual staging times per site
-
-res <- matrix(NA, ncol = sdpM@Init$NSites+1, nrow = dim(simu)[1])
-
-for(i in 1:nrow(res)) {
-  tmp <- simu[i,,]
-  if(sum(tmp[5,])>0) tmp <- tmp[,1:(min(which(tmp[5,]==1)))]
-  res[i,] <- apply(cbind(0:sdpM@Init$NSites), 1, function(x) {
-    ifelse(all(tmp[2,]<x) , NA, sum(tmp[2,]==x, na.rm = T))
-  })
-}
-Staging <- res
-Staging[,1] # staging on site 1
-
-plot(  Staging[,]) 
-
-
-
-
-######### Plot Individual body condition over time
-
-plot(NA, xlim = c(0, sdpM@Init$MaxT+1), ylim = c(1, sdpM@Init$MaxX), bty = "n", xlab = "time", ylab = "body condition", 
-     las = 1, cex.lab  = 1.2)
-
-for(i in 1:dim(simu)[1]) {
-  tmp <- simu[i,,]
-  tmp <- tmp[,tmp[5,]!=1]
-  if(!is.null(nrow(tmp))) lines(tmp[1,], tmp[3,], col = adjustcolor("grey60", alpha.f = 0.6))
-}
-for(i in 1:dim(simu)[1]) {
-  tmp <- simu[i,,]
-  tmp <- tmp[,!is.na(tmp[2,]) & tmp[5,]!=1]
-  if(!is.null(nrow(tmp))) points(tmp[1,], tmp[3,], col = c(rainbow(sdpM@Init$NSites+1, alpha = 0.6)[tmp[2,]+1]), pch = 16) else {
-    points(tmp[1], tmp[3], col = c(rainbow(sdpM@Init$NSites, alpha = 0.6)[tmp[2]]), pch = 16) 
-  }
-}
-legend("topleft", paste("site", 1:sdpM@Init$NSites), pch = 16, col = rainbow(sdpM@Init$NSites), bty="n",ncol=2)
-
-#########
-
-
-cls <- rainbow(sdp@Init$NSites+1)
-matplot(t(simu[,3,]), type = "p", pch = 16, cex = .5, col = "grey90")
-matplot(t(simu[,2,]), type = "p", pch = 16, cex = .5, col = "grey90")
+    ######### Plot Individual body condition over time
+    plot(NA, xlim = c(0, sdpM@Init$MaxT+1), ylim = c(1, sdpM@Init$MaxX), bty = "n", xlab = "time", ylab = "body condition", 
+         las = 1, cex.lab  = 1.2)
+    
+    for(i in 1:dim(simu)[1]) {
+      tmp <- simu[i,,]
+      tmp <- tmp[,tmp[5,]!=1]
+      if(!is.null(nrow(tmp))) lines(tmp[1,], tmp[3,], col = adjustcolor("grey60", alpha.f = 0.6))
+    }
+    for(i in 1:dim(simu)[1]) {
+      tmp <- simu[i,,]
+      tmp <- tmp[,!is.na(tmp[2,]) & tmp[5,]!=1]
+      if(!is.null(nrow(tmp))) points(tmp[1,], tmp[3,], col = c(rainbow(sdpM@Init$NSites+1, alpha = 0.6)[tmp[2,]+1]), pch = 16) else {
+        points(tmp[1], tmp[3], col = c(rainbow(sdpM@Init$NSites, alpha = 0.6)[tmp[2]]), pch = 16) 
+      }
+    }
+    legend("topleft", paste("site", 1:sdpM@Init$NSites), pch = 16, col = rainbow(sdpM@Init$NSites), bty="n",ncol=2)
+    #########
 
 
 
