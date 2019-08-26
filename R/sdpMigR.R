@@ -367,7 +367,7 @@ simuPlot <- function(simu, sdpM, fun = "median") {
     }
   }
   
-  legend("topleft", paste("site", 1:(sdpM@Init$NSites+1)), pch = 16, col = rainbow(sdpM@Init$NSites+1), bty="n",ncol=2)
+  legend("topleft", paste("site", 1:(sdpM@Init$NSites+1)), pch = 16, col = rainbow(sdpM@Init$NSites+1), bty="n")
   
   res <- matrix(NA, ncol = sdpM@Init$NSites+1, nrow = dim(simu)[1])
   
